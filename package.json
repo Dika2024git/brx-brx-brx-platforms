@@ -1,0 +1,21 @@
+{
+  "name": "brorax-models",
+  "version": "1.0.0",
+  "description": "AI Chatbot pertanyaan umum dan nyeleneh dengan Express.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "BroRAX AI",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "fuse.js": "^7.0.0",
+    "language-detect": "^0.2.0",
+    "natural": "^7.0.0",
+    "xml2js": "^0.6.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

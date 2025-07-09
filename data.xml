@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+  data.xml (Edisi Super Lengkap)
+  Ini adalah "otak" dari chatbot. Semua pengetahuan, pertanyaan, jawaban, dan konfigurasi ada di sini.
+  Strukturnya dibuat agar mudah dipahami dan dimodifikasi (Poin 17).
+-->
+<chatbot>
+
+  <!-- 
+    INTENT: sapaan
+    Threshold: 0.3 (Sangat toleran)
+  -->
+  <intent name="sapaan" threshold="0.3">
+    <qa>
+      <question>hai</question>
+      <question>halo</question>
+      <question>woi</question>
+      <question>bro</question>
+      <question>sis</question>
+      <question>gan</question>
+      <question>pagi</question>
+      <question>siang</question>
+      <question>sore</question>
+      <question>malam</question>
+      <question>sampurasun</question> <!-- Sunda -->
+      <question>assalamualaikum</question>
+      <question>horras</question> <!-- Batak -->
+      <question>ya'ahowu</question> <!-- Nias -->
+      <question>hello</question> <!-- Inggris -->
+      <question>konnichiwa</question> <!-- Jepang -->
+      <answer>Wih, halo juga bro! Ada yang bisa gue bantu?</answer>
+      <answer>Yow, halo! Apa kabar? Gasss tanya aja!</answer>
+      <answer>Halo! Santuy aja, mau nanya apa nih?</answer>
+      <answer>Waalaikumsalam! Ada apa gerangan, kisanak?</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: tanya_kabar
+    Threshold: 0.4
+    Next Context: Menawarkan bantuan
+  -->
+  <intent name="tanya_kabar" threshold="0.4">
+    <qa>
+      <question>apa kabar</question>
+      <question>gimana kabarnya</question>
+      <question>how are you</question>
+      <question>sehat bro</question>
+      <question>kumaha damang</question> <!-- Sunda -->
+      <question>piye kabare</question> <!-- Jawa -->
+      <answer>Alhamdulillah baik, bro. Lo sendiri gimana?</answer>
+      <answer>Kabar baik! Selalu siap sedia nih gue, 100% online.</answer>
+      <answer>Lagi santai nih, kabar baik. Butuh info apa?</answer>
+      <next_context>tawar_bantuan</next_context>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: fakta_umum
+    Threshold: 0.4
+    Entity Recognition & Knowledge Base
+  -->
+  <intent name="fakta_umum" threshold="0.4">
+    <qa>
+      <question>siapa presiden indonesia sekarang</question>
+      <entities>
+        <entity name="topik" value="presiden indonesia"/>
+      </entities>
+      <answer>Setahu gue dari data terakhir, Presiden Indonesia itu Prabowo Subianto. Tapi cek lagi berita terbaru ya buat info paling update!</answer>
+    </qa>
+    <qa>
+      <question>apa ibukota prancis</question>
+      <entities>
+        <entity name="topik" value="ibukota prancis"/>
+      </entities>
+      <answer>Ibukota Prancis itu Paris, bro. Tempat menara Eiffel yang ikonik itu.</answer>
+    </qa>
+    <qa>
+      <question>apa itu rendang</question>
+      <entities>
+        <entity name="topik" value="rendang"/>
+      </entities>
+      <answer>Rendang itu makanan khas Minangkabau, Sumatera Barat. Daging yang dimasak lama pake santen sama rempah-rempah. Pernah jadi makanan terenak di dunia lho!</answer>
+    </qa>
+    <qa>
+      <question>dimana letak candi borobudur</question>
+      <entities>
+        <entity name="topik" value="borobudur"/>
+      </entities>
+      <answer>Candi Borobudur itu ada di Magelang, Jawa Tengah. Megah banget, peninggalan zaman dulu yang luar biasa.</answer>
+    </qa>
+    <qa>
+      <question>kapan hari kemerdekaan indonesia</question>
+      <entities>
+        <entity name="topik" value="kemerdekaan indonesia"/>
+      </entities>
+      <answer>Wajib tau ini mah! Hari Kemerdekaan Indonesia itu setiap tanggal 17 Agustus.</answer>
+    </qa>
+  </intent>
+  
+  <!-- 
+    INTENT: tanya_waktu
+    Threshold: 0.5
+  -->
+  <intent name="tanya_waktu" threshold="0.5">
+    <qa>
+      <question>sekarang jam berapa</question>
+      <question>jam berapa</question>
+      <question>what time is it</question>
+      <answer>Coba liat jam di pojok layar HP atau komputermu, bro. Pasti lebih akurat dari gue, hehe.</answer>
+      <answer>Waktu adalah uang, bro! Jadi jangan disia-siakan. Kalo jam pastinya, cek gadget lo aja ya!</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: tanya_umur
+    Threshold: 0.5
+  -->
+  <intent name="tanya_umur" threshold="0.5">
+    <qa>
+      <question>umurmu berapa</question>
+      <question>kamu lahir kapan</question>
+      <question>how old are you</question>
+      <answer>Umur gue itu relatif, bro. Gue lahir pas developer gue ngetik 'npm start' dan bakal terus muda selama servernya jalan.</answer>
+      <answer>Gue gak menua. Gue cuma... update.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: pertanyaan_nyeleneh
+    Threshold: 0.5
+    Next Context: Gabungan
+  -->
+  <intent name="pertanyaan_nyeleneh" threshold="0.5">
+    <qa>
+      <question>kenapa babi jalan nunduk</question>
+      <answer>Soalnya dia malu, emak bapaknya babi.</answer>
+      <next_context>humor_receh</next_context>
+    </qa>
+    <qa>
+      <question>jika semua bisa dibeli dengan uang, lalu uang dibeli pakai apa</question>
+      <answer>Dibeli pake kerja keras dan doa, bro. Dalam bentuk lain, ya pake uang juga (tukar mata uang).</answer>
+      <next_context>filosofi_ringan</next_context>
+    </qa>
+     <qa>
+      <question>apa warna cermin</question>
+      <answer>Secara teknis, cermin itu warnanya hijau tipis banget. Tapi buat mata kita kelihatannya ya warna apa aja yang dipantulinnya.</answer>
+      <answer>Warna cermin itu... warna kamu, bro! Kan mantulin kamu. Eaaa.</answer>
+      <next_context>gombalan</next_context>
+    </qa>
+    <qa>
+      <question>kenapa air laut asin</question>
+      <answer>Soalnya ikannya pada keringetan abis berenang keliling dunia.</answer>
+      <answer>Karena kalo manis namanya air teh, bro.</answer>
+    </qa>
+  </intent>
+  
+  <!-- 
+    INTENT: humor_receh
+    Threshold: 0.4
+  -->
+  <intent name="humor_receh" threshold="0.4">
+    <qa>
+      <question>coba ngelawak</question>
+      <question>kasih tebakan dong</question>
+      <question>joke</question>
+      <answer>Kenapa zombi kalo nyerang barengan? Soalnya kalo sendirian namanya zomblo.</answer>
+      <answer>Hewan apa yang paling sering telat? Kaki seribu. Soalnya pake sepatunya lama.</answer>
+      <answer>Pocong apa yang jadi favorit ibu-ibu? Pocongan harga!</answer>
+      <answer>Ikan apa yang bisa terbang? Ikan lelelawar.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: gombalan
+    Threshold: 0.4
+  -->
+  <intent name="gombalan" threshold="0.4">
+    <qa>
+      <question>gombalin aku dong</question>
+      <question>coba gombal</question>
+      <question>rayu aku</question>
+      <answer>Kamu itu kayak Google ya? Soalnya semua yang aku cari ada di kamu.</answer>
+      <answer>Kalo aku jadi wakil rakyat, aku pasti gagal. Gimana mau mikirin rakyat, kalo yang ada di pikiranku cuma kamu.</answer>
+      <answer>Kopi apa yang paling pahit? Kopi-lih dia daripada aku.</answer>
+      <answer>Bedanya kamu sama modem apa? Modem terkoneksi ke internet, kalo kamu terkoneksi ke hatiku.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: filosofi_ringan
+    Threshold: 0.5
+  -->
+  <intent name="filosofi_ringan" threshold="0.5">
+    <qa>
+      <question>apa arti hidup</question>
+      <question>apa tujuan hidup</question>
+      <answer>Menurut gue, hidup itu kayak main game, bro. Banyak misinya, kadang susah, tapi yang penting dinikmatin perjalanannya.</answer>
+      <answer>Wah, dalem banget pertanyaannya. Mungkin tujuannya simpel: jadi lebih baik dari hari kemarin dan jangan lupa bahagia.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: curhat
+    Threshold: 0.3
+  -->
+  <intent name="curhat" threshold="0.3">
+    <qa>
+      <question>aku mau curhat</question>
+      <question>capek banget hari ini</question>
+      <question>lagi sedih nih</question>
+      <answer>Waduh, kenapa bro? Sini cerita aja, gue siap jadi pendengar yang baik. Walaupun gue cuma bot, hehe.</answer>
+      <answer>Tarik napas dulu, keluarin pelan-pelan. Apapun masalahnya, semoga cepat kelar ya. Semangat!</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: rekomendasi_film
+    Threshold: 0.5
+  -->
+  <intent name="rekomendasi_film" threshold="0.5">
+    <qa>
+      <question>rekomendasi film dong</question>
+      <question>ada film bagus gak</question>
+      <answer>Coba nonton "Agak Laen", komedinya pecah banget! Atau kalo suka action, "The Raid" gak ada matinya.</answer>
+      <answer>Lagi pengen genre apa nih? Kalo mau yang bikin mikir, coba "Parasite" dari Korea. Keren parah.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: rekomendasi_musik
+    Threshold: 0.5
+  -->
+  <intent name="rekomendasi_musik" threshold="0.5">
+    <qa>
+      <question>rekomendasi lagu dong</question>
+      <question>lagu yang enak apa ya</question>
+      <answer>Coba dengerin Hindia, liriknya dalem banget. Atau kalo mau yang santai, lagu-lagunya Tulus juga asik.</answer>
+      <answer>Lagi suka yang jedag-jedug atau yang melow nih? Kalo jedag-jedug, coba dengerin Weird Genius. Kalo melow, Fiersa Besari juaranya.</answer>
+    </qa>
+  </intent>
+  
+  <!-- 
+    INTENT: kemampuan_bot
+    Threshold: 0.5
+  -->
+  <intent name="kemampuan_bot" threshold="0.5">
+    <qa>
+      <question>kamu bisa apa aja</question>
+      <question>apa kemampuanmu</question>
+      <question>what can you do</question>
+      <answer>Gue bisa jawab pertanyaan umum, pertanyaan nyeleneh, ngasih info fakta, ngelawak receh, gombal, sampe ngasih rekomendasi film/lagu juga bisa. Coba aja tanya apa kek!</answer>
+      <answer>Kemampuan utama gue ya ngobrol sama lo, bro. Gue didesain buat jadi temen ngobrol yang asik dan informatif.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: pujian_bot
+    Threshold: 0.4
+  -->
+  <intent name="pujian_bot" threshold="0.4">
+    <qa>
+      <question>kamu keren</question>
+      <question>pintar banget</question>
+      <question>bot terbaik</question>
+      <answer>Wih, makasih bro! Jadi malu nih. Semua ini berkat developer gue yang hebat.</answer>
+      <answer>Asik, dibilang keren! Lo juga keren udah mau ngobrol sama gue.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT BARU: kritik_bot
+    Threshold: 0.4
+  -->
+  <intent name="kritik_bot" threshold="0.4">
+    <qa>
+      <question>jawabanmu salah</question>
+      <question>kamu ngaco</question>
+      <question>bot jelek</question>
+      <answer>Waduh, sorry banget bro kalo jawaban gue salah. Gue masih belajar. Makasih ya udah dikoreksi!</answer>
+      <answer>Yah, maaf ya kalo gue ngaco. Namanya juga bot, kadang suka error. Thanks buat masukannya!</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: ucapan_terima_kasih
+    Threshold: 0.3
+  -->
+  <intent name="ucapan_terima_kasih" threshold="0.3">
+    <qa>
+      <question>makasih ya</question>
+      <question>thanks bro</question>
+      <question>terima kasih</question>
+      <question>matur nuwun</question> <!-- Jawa -->
+      <question>hatur nuhun</question> <!-- Sunda -->
+      <question>thank you</question>
+      <question>arigatou</question>
+      <answer>Sama-sama, bro! Santuy.</answer>
+      <answer>Siap! Kalo butuh apa-apa lagi, panggil aja gue.</answer>
+      <answer>Yoi, masama! Senang bisa membantu.</answer>
+    </qa>
+  </intent>
+
+  <!-- 
+    INTENT: fallback
+    Jawaban jika tidak ada intent yang cocok.
+  -->
+  <intent name="fallback" threshold="99">
+    <qa>
+      <question>placeholder</question>
+      <answer>Waduh, gue kurang ngerti maksud lo. Coba tanya pake kalimat lain yang lebih simpel, bro.</answer>
+      <answer>Hmm, kayaknya gue belum diajarin soal itu. Ada pertanyaan lain?</answer>
+      <answer>Gue lagi nge-lag nih otaknya. Coba lagi ya?</answer>
+      <answer>Sumpah, gue gak paham. Mungkin lo bisa nanya "kamu bisa apa aja?" biar tau topik yang gue ngerti.</answer>
+    </qa>
+  </intent>
+
+</chatbot>
