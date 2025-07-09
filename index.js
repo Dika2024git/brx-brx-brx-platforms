@@ -1,31 +1,58 @@
 // index.js
 // Mengimpor library yang dibutuhkan
 const express = require('express');
-const fs = require('fs').promises; // Menggunakan promise-based fs
+const fs = require('fs').promises;
 const path = require('path');
 const { parseStringPromise } = require('xml2js');
 const Fuse = require('fuse.js');
 const LanguageDetect = require('language-detect');
 const natural = require('natural');
+const mongoose = require('mongoose');
+require('dotenv').config(); // Memuat environment variables dari file .env
 
-// Inisialisasi aplikasi Express
+// --- Inisialisasi Aplikasi Express ---
 const app = express();
 app.use(express.json()); // Middleware untuk parsing JSON body
 
-// Path ke file data dan log
+// --- Konstanta dan Variabel Global ---
 const DATA_XML_PATH = path.join(__dirname, 'data.xml');
-const LOG_JSON_PATH = path.join(__dirname, 'log.json');
+let chatbotData = []; // Akan diisi dengan data dari XML setelah dimuat
+let fallbackIntent = null; // Menyimpan intent fallback secara terpisah
+const tokenizer = new natural.WordTokenizer(); // Inisialisasi tokenizer
 
-// Variabel global untuk menyimpan "otak" chatbot
-let chatbotData = [];
-let fallbackIntent = null;
+// --- Konfigurasi dan Model Mongoose (Database) ---
+// Skema untuk koleksi log. Ini adalah struktur data untuk setiap log di MongoDB.
+const logSchema = new mongoose.Schema({
+    query: {
+        type: String,
+        required: [true, 'Query tidak boleh kosong'],
+        trim: true
+    },
+    intentDetected: {
+        type: String,
+        default: 'unknown'
+    },
+    language: {
+        type: String,
+        default: 'unknown'
+    },
+    confidenceScore: {
+        type: Number,
+        default: 0
+    },
+    timestamp: {
+        type: Date,
+        default: Date.now
+    }
+});
 
-// Inisialisasi tokenizer
-const tokenizer = new natural.WordTokenizer();
+// Membuat model dari skema. Model ini yang akan kita gunakan untuk berinteraksi dengan database.
+const Log = mongoose.model('Log', logSchema);
+// ----------------------------------------------------
 
 /**
- * Fungsi untuk memuat dan mem-parsing data.xml.
- * Data diubah menjadi struktur yang lebih mudah digunakan oleh Fuse.js.
+ * Memuat dan mem-parsing data.xml saat server pertama kali dijalankan.
+ * Data diubah menjadi struktur array of objects agar mudah diproses oleh Fuse.js.
  */
 async function loadChatbotData() {
     try {
@@ -33,20 +60,25 @@ async function loadChatbotData() {
         const xmlData = await fs.readFile(DATA_XML_PATH, 'utf8');
         const parsedData = await parseStringPromise(xmlData);
 
+        if (!parsedData.chatbot || !parsedData.chatbot.intent) {
+            throw new Error("Struktur XML tidak valid. Tag <chatbot> atau <intent> tidak ditemukan.");
+        }
+
         const intents = parsedData.chatbot.intent;
         let processedData = [];
 
         for (const intent of intents) {
             const intentName = intent.$.name;
-            const threshold = parseFloat(intent.$.threshold || 0.4); // Default threshold
+            // Default threshold jika tidak didefinisikan di XML
+            const threshold = parseFloat(intent.$.threshold || 0.4);
 
-            // Menangani intent fallback secara khusus
+            // Menangani intent fallback secara khusus untuk efisiensi
             if (intentName === 'fallback') {
                 fallbackIntent = {
                     name: intentName,
                     answers: intent.qa[0].answer.map(ans => ans._ || ans)
                 };
-                continue; // Lanjut ke intent berikutnya
+                continue; // Lanjut ke intent berikutnya, tidak perlu dimasukkan ke data pencarian
             }
 
             if (intent.qa) {
@@ -57,88 +89,74 @@ async function loadChatbotData() {
                     const nextContext = qa.next_context ? (qa.next_context[0]._ || qa.next_context[0]).split(',').map(s => s.trim()) : [];
 
                     for (const q of questions) {
-                        processedData.push({
-                            question: (q._ || q).toLowerCase(), // Simpan pertanyaan dalam lowercase
-                            intent: intentName,
-                            threshold: threshold,
-                            answers: answers,
-                            entities: entities,
-                            nextContext: nextContext
-                        });
+                        // Defensive check untuk memastikan pertanyaan tidak kosong
+                        if (q && (q._ || q)) {
+                             processedData.push({
+                                question: (q._ || q).toLowerCase(), // Simpan pertanyaan dalam lowercase untuk pencarian case-insensitive
+                                intent: intentName,
+                                threshold: threshold,
+                                answers: answers,
+                                entities: entities,
+                                nextContext: nextContext
+                            });
+                        }
                     }
                 }
             }
         }
         
         chatbotData = processedData;
-        console.log(`Data berhasil dimuat. Total ${chatbotData.length} pola pertanyaan dari ${intents.length - 1} intent.`);
+        console.log(`Data berhasil dimuat. Total ${chatbotData.length} pola pertanyaan dari ${intents.length - 1} intent aktif.`);
 
     } catch (error) {
-        console.error('Gagal memuat atau memproses data.xml:', error);
-        // Hentikan aplikasi jika data utama gagal dimuat
+        console.error('FATAL: Gagal memuat atau memproses data.xml:', error);
+        // Hentikan aplikasi jika data utama gagal dimuat, karena bot tidak bisa berfungsi.
         process.exit(1);
     }
 }
 
 /**
- * Fungsi untuk mencatat query pengguna ke dalam log.json
- * @param {string} query - Pertanyaan dari pengguna.
+ * Mencatat query pengguna ke dalam database MongoDB.
+ * Fungsi ini sengaja dibuat "fire-and-forget" (tidak di-await di endpoint utama)
+ * agar tidak memperlambat waktu respons chatbot ke pengguna.
+ * @param {object} logData - Objek berisi data log yang akan disimpan.
  */
-async function logQuery(query) {
-    const logEntry = {
-        query: query,
-        timestamp: new Date().toISOString()
-    };
-
+async function logQueryToDB(logData) {
     try {
-        let logs = [];
-        try {
-            // Coba baca file log yang ada
-            const data = await fs.readFile(LOG_JSON_PATH, 'utf8');
-            logs = JSON.parse(data);
-        } catch (readError) {
-            // Jika file tidak ada, tidak apa-apa, kita akan membuatnya
-            if (readError.code !== 'ENOENT') {
-                throw readError;
-            }
-        }
-        
-        logs.push(logEntry);
-        await fs.writeFile(LOG_JSON_PATH, JSON.stringify(logs, null, 2), 'utf8');
-
+        const newLog = new Log(logData);
+        await newLog.save();
     } catch (error) {
-        console.error('Gagal menulis ke log.json:', error);
+        // Kesalahan logging tidak boleh menghentikan aplikasi, cukup catat di konsol.
+        console.error('Gagal menyimpan log ke MongoDB:', error.message);
     }
 }
 
-// Endpoint utama chatbot
+// --- Endpoint Utama Chatbot ---
 app.get('/chat', async (req, res) => {
     const userQuery = req.query.q;
 
-    if (!userQuery) {
-        return res.status(400).json({ error: 'Parameter "q" (query) tidak boleh kosong, bro!' });
+    if (!userQuery || userQuery.trim() === '') {
+        return res.status(400).json({ 
+            error: true, 
+            message: 'Parameter "q" (query) tidak boleh kosong, bro!' 
+        });
     }
     
-    // 13. Mencatat input pengguna
-    await logQuery(userQuery);
-
-    // 7 & 14. Deteksi bahasa
+    // 1. Analisis Input Pengguna
     const languageDetector = new LanguageDetect();
     const detectedLangs = languageDetector.detect(userQuery, 1);
     const lang = detectedLangs.length > 0 ? detectedLangs[0][0] : 'unknown';
-
-    // 19. Tokenizer
     const tokens = tokenizer.tokenize(userQuery.toLowerCase());
 
+    // 2. Pencarian Intent
     let bestMatch = null;
-    let bestScore = 1; // Fuse.js score: 0 is perfect match, 1 is no match
+    let bestScore = 1; // Skor Fuse.js: 0 = sempurna, 1 = tidak cocok
 
-    // 3, 4, 15, 16. Pencarian intent dinamis dengan threshold berbeda
-    const intents = [...new Set(chatbotData.map(item => item.intent))]; // Ambil semua nama intent unik
-    
-    for (const intentName of intents) {
+    // Loop melalui setiap intent unik untuk menerapkan threshold yang berbeda
+    const uniqueIntents = [...new Set(chatbotData.map(item => item.intent))]; 
+    for (const intentName of uniqueIntents) {
         const itemsInIntent = chatbotData.filter(item => item.intent === intentName);
-        const threshold = itemsInIntent[0].threshold; // Semua item dalam intent punya threshold yang sama
+        const threshold = itemsInIntent[0].threshold; // Semua item dalam satu intent punya threshold yang sama
 
         const fuse = new Fuse(itemsInIntent, {
             keys: ['question'],
@@ -149,80 +167,89 @@ app.get('/chat', async (req, res) => {
 
         const results = fuse.search(userQuery);
 
+        // Jika ditemukan hasil yang lebih baik dari sebelumnya
         if (results.length > 0 && results[0].score < bestScore) {
             bestScore = results[0].score;
             bestMatch = results[0].item;
         }
     }
 
-    // Jika ada hasil yang cocok
+    // 3. Membentuk dan Mengirim Respons
     if (bestMatch) {
-        // 9. Ambil jawaban acak
+        const confidenceScore = (1 - bestScore);
         const randomAnswer = bestMatch.answers[Math.floor(Math.random() * bestMatch.answers.length)];
 
-        // 1, 5, 8, 10, 18. Siapkan respons
-        return res.json({
+        // Kirim respons ke pengguna
+        res.json({
             reply: randomAnswer,
             intent: bestMatch.intent,
-            entities: bestMatch.entities, // Entity Recognition
-            next_context: bestMatch.nextContext, // Konteks selanjutnya
+            entities: bestMatch.entities,
+            next_context: bestMatch.nextContext,
             language: lang,
-            tokens: tokens,
-            confidence_score: (1 - bestScore).toFixed(4) // Ubah skor fuse menjadi skor kepercayaan (makin tinggi makin bagus)
+            confidence_score: parseFloat(confidenceScore.toFixed(4))
         });
+
+        // Catat ke database (fire-and-forget)
+        logQueryToDB({ query: userQuery, intentDetected: bestMatch.intent, language: lang, confidenceScore: confidenceScore });
+
     } else {
-        // Jika tidak ada yang cocok, gunakan fallback
-        if (fallbackIntent) {
-            const randomFallback = fallbackIntent.answers[Math.floor(Math.random() * fallbackIntent.answers.length)];
-            return res.status(404).json({
-                reply: randomFallback,
-                intent: 'fallback',
-                language: lang,
-                tokens: tokens,
-                confidence_score: 0
-            });
-        } else {
-            // Fallback darurat jika intent fallback tidak terdefinisi di XML
-            return res.status(404).json({
-                error: 'Waduh, gue lagi bingung nih. Coba tanya yang lain, ya?',
-                intent: 'unknown'
-            });
-        }
+        // Jika tidak ada intent yang cocok, gunakan fallback
+        const fallbackReply = fallbackIntent 
+            ? fallbackIntent.answers[Math.floor(Math.random() * fallbackIntent.answers.length)]
+            : 'Waduh, gue lagi bingung nih. Coba tanya yang lain, ya?';
+        
+        res.status(404).json({
+            reply: fallbackReply,
+            intent: 'fallback',
+            language: lang,
+            confidence_score: 0
+        });
+
+        // Catat juga fallback ke database
+        logQueryToDB({ query: userQuery, intentDetected: 'fallback', language: lang, confidenceScore: 0 });
     }
 });
 
-// Endpoint untuk serve halaman depan sederhana
+// --- Endpoint Tambahan ---
+// Halaman utama untuk verifikasi server berjalan
 app.get('/', (req, res) => {
     res.send(`
         <html>
-            <head>
-                <title>Chatbot Gaul Lokal</title>
-                <style>
-                    body { font-family: sans-serif; background-color: #f0f0f0; text-align: center; padding-top: 50px; }
-                    h1 { color: #333; }
-                    p { color: #555; }
-                    code { background-color: #eee; padding: 3px 6px; border-radius: 4px; }
-                </style>
-            </head>
-            <body>
+            <head><title>Chatbot Gaul Lokal</title></head>
+            <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
                 <h1>🤖 Chatbot Gaul Lokal Indonesia 🤖</h1>
-                <p>Servernya udah jalan, bro! Coba panggil endpoint-nya, ya.</p>
+                <p>Servernya udah jalan dan terhubung ke MongoDB, bro!</p>
                 <p>Contoh: <code>/chat?q=siapa presiden indonesia sekarang</code></p>
             </body>
         </html>
     `);
 });
 
-
-// Jalankan server setelah data dimuat
+// --- Proses Startup Server ---
 const PORT = process.env.PORT || 3000;
-loadChatbotData().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server chatbot gaul berjalan di http://localhost:${PORT}`);
-    });
-}).catch(error => {
-    console.error("Gagal menjalankan server karena data tidak bisa dimuat.", error);
-});
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// Ekspor app untuk Vercel
+if (!MONGODB_URI) {
+    console.error('FATAL: MONGODB_URI tidak ditemukan di environment variables. Harap buat file .env dan definisikan variabel tersebut.');
+    process.exit(1);
+}
+
+// Urutan startup: 1. Hubungkan DB -> 2. Muat data XML -> 3. Jalankan server Express
+console.log('Menghubungkan ke MongoDB...');
+mongoose.connect(MONGODB_URI)
+    .then(() => {
+        console.log('Berhasil terhubung ke MongoDB.');
+        return loadChatbotData(); // Lanjutkan memuat data dari XML
+    })
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server chatbot gaul berjalan di http://localhost:${PORT}`);
+        });
+    })
+    .catch(err => {
+        console.error('FATAL: Terjadi kesalahan saat proses startup server:', err);
+        process.exit(1);
+    });
+
+// Ekspor app untuk kompatibilitas dengan Vercel
 module.exports = app;
